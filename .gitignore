@@ -1,0 +1,27 @@
+
+# Python bytecode & cache
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.venv/
+env/
+venv/
+.env
+env/
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# IDE files
+.vscode/
+.idea/
+
+# Local Data and Docker volumes
+workspace/checkpoint/
+workspace/spark-warehouse/
+pgdata/
+
+# OS files
+.DS_Store
+Thumbs.db
