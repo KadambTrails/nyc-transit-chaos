@@ -51,6 +51,8 @@ services:
       - ./workspace:/home/jovyan/work
     environment:
       GRANT_SUDO: "yes"
+    env_file:
+      - .env
     user: root
 
 volumes:
