@@ -55,6 +55,7 @@ def stream_mta_data(producer):
                             "latitude": float(v_data.position.latitude),
                             "longitude": float(v_data.position.longitude),
                             "current_status": gtfs_realtime_pb2.VehiclePosition.VehicleStopStatus.Name(v_data.current_status),
+                            "current_stop_id": v_data.stop_id,
                             "timestamp": int(v_data.timestamp) if v_data.timestamp else int(time.time())
                         }
 
