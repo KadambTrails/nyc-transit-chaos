@@ -53,3 +53,77 @@ CREATE TRIGGER trg_process_subway_staging
 BEFORE INSERT ON staging_subway_stream
 FOR EACH ROW
 EXECUTE FUNCTION process_subway_staging_rows();
+
+---------------------- gamified Trigger Alter -------------------------
+
+CREATE TABLE IF NOT EXISTS game_multiplier_zones (
+    zone_id SERIAL PRIMARY KEY,
+    zone_name VARCHAR(100),
+    multiplier INT,
+    geom GEOMETRY(Polygon, 4326)
+);
+
+INSERT INTO nyc_spatial_db.public.game_multiplier_zones (zone_name, multiplier, geom)
+VALUES (
+    'Times Square Chaos Zone', 
+    3,
+    ST_GeomFromText('POLYGON((-73.992 40.750, -73.972 40.750, -73.972 40.765, -73.992 40.765, -73.992 40.750))', 4326)
+) ON CONFLICT DO NOTHING;
+
+
+select * from nyc_spatial_db.public.game_multiplier_zones 
+
+ALTER TABLE fact_subway_spatial_stream ADD COLUMN IF NOT EXISTS current_score INT DEFAULT 0;
+ALTER TABLE fact_subway_spatial_stream ADD COLUMN IF NOT EXISTS in_zone BOOLEAN DEFAULT FALSE;
+
+
+CREATE OR REPLACE FUNCTION process_subway_game_logic()
+RETURNS TRIGGER AS $$
+DECLARE
+    current_geom GEOMETRY;
+    active_multiplier INT := 1;
+    proximity_count INT := 0;
+    final_calculated_points INT := 10; 
+    is_potato_holder BOOLEAN := FALSE;
+BEGIN
+    IF NEW.final_lat IS NOT NULL AND NEW.final_lon IS NOT NULL THEN
+        current_geom := ST_SetSRID(ST_MakePoint(NEW.final_lon, NEW.final_lat), 4326);
+        
+        -- GAME RULE 1: Is the train inside a score multiplier zone?
+        SELECT COALESCE(MAX(multiplier), 1) INTO active_multiplier
+        FROM game_multiplier_zones
+        WHERE ST_Contains(geom, current_geom);
+        
+        -- GAME RULE 2: Are there other trains within 300 meters right now?
+        SELECT COUNT(*) INTO proximity_count
+        FROM fact_subway_spatial_stream
+        WHERE ST_DWithin(coordinates::geography, current_geom::geography, 300)
+          AND event_timestamp > NOW() - INTERVAL '3 minutes'
+          AND train_id != NEW.train_id;
+
+        
+        final_calculated_points := (final_calculated_points + (proximity_count * 50)) * active_multiplier;
+
+        -- GAME RULE 3: If closely crowded by more than 2 trains, pass the "Hot Potato" tag!
+        IF proximity_count >= 2 THEN
+            is_potato_holder := TRUE;
+        END IF;
+
+        -- Insert the finalized gamified state directly into production
+        INSERT INTO fact_subway_spatial_stream (
+            train_id, route_id, current_status, current_stop_id, event_timestamp, coordinates, current_score, in_zone
+        ) VALUES (
+            NEW.train_id, NEW.route_id, NEW.current_status, NEW.current_stop_id, NEW.event_timestamp, current_geom, final_calculated_points, is_potato_holder
+        );
+    END IF;
+    
+    RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+
+DROP TRIGGER IF EXISTS trg_process_subway_staging ON staging_subway_stream;
+CREATE TRIGGER trg_process_subway_staging
+BEFORE INSERT ON staging_subway_stream
+FOR EACH ROW
+EXECUTE FUNCTION process_subway_game_logic();
