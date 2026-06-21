@@ -1,8 +1,8 @@
 import os
 from dotenv import load_dotenv
 from pyspark.sql import SparkSession
-from pyspark.sql.types import StructType, StructField, StringType, DoubleType, LongType
-from pyspark.sql.functions import col, from_json, when
+from pyspark.sql.types import *
+from pyspark.sql.functions import *
 
 load_dotenv()
 
@@ -19,7 +19,7 @@ def write_to_postgis(batch_df, batch_id):
         col("route_id"),
         col("current_status"),
         col("current_stop_id"),
-        col("event_timestamp"),
+        from_unixtime(col("timestamp")).cast("timestamp").alias("event_timestamp"),
         col("final_lat"),
         col("final_lon")
     ).write \
@@ -35,7 +35,7 @@ def write_to_postgis(batch_df, batch_id):
 if __name__ == "__main__":
     spark = SparkSession.builder \
         .appName("NYC-Transit-Chaos-Consumer") \
-        .config("spark.jars.packages", "org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0,org.postgresql:postgresql:42.6.0") \
+        .config("spark.jars.packages", "org.apache.spark:spark-sql-kafka-0-10_2.13:4.1.2,org.postgresql:postgresql:42.6.0")\
         .getOrCreate()
 
     kafka_schema = StructType([
@@ -50,7 +50,7 @@ if __name__ == "__main__":
 
     raw_kafka_stream = spark.readStream \
         .format("kafka") \
-        .option("kafka.bootstrap.servers", "kafka:29092") \
+        .option("kafka.bootstrap.servers", "127.0.0.1:9092") \
         .option("subscribe", "mta-subway-raw") \
         .option("startingOffsets", "latest") \
         .load()
@@ -76,10 +76,10 @@ if __name__ == "__main__":
         "left"
     ).withColumn(
         "final_lat", 
-        when(col("latitude") == 0.0, col("static_lat")).otherwise(col("latitude"))
+        when(col("latitude") == 0.0, col("stop_lat")).otherwise(col("latitude"))
     ).withColumn(
         "final_lon", 
-        when(col("longitude") == 0.0, col("static_lon")).otherwise(col("longitude"))
+        when(col("longitude") == 0.0, col("stop_lon")).otherwise(col("longitude"))
     )
 
     query = enriched_stream.writeStream \
