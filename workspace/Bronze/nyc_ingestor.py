@@ -64,16 +64,16 @@ def stream_mta_data(producer):
 
             except KafkaError as ke:
                 print(f"[KAFKA ERROR] Broker unreachable: {ke}. Backing off...")
-                time.sleep(5)
+                time.sleep(1)
                 break
             except Exception as e:
                 print(f"Error processing feed {feed_name}: {e}")
                 
-        print(f"[INGEST] Successfully pushed {total_records} updates to Kafka. Sleeping for 15s...")
+        print(f"[INGEST] Successfully pushed {total_records} updates to Kafka.")
         
         # Enforce polite polling loop matching MTA update schedules
         elapsed = time.time() - start_time
-        time.sleep(max(1, 15 - elapsed))
+        time.sleep(max(1, 2 - elapsed))
 
 if __name__ == "__main__":
     try:
