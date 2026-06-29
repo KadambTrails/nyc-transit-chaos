@@ -202,7 +202,7 @@ if __name__ == "__main__":
         .load()
 
     enriched_stream = parsed_stream.join(
-        static_stops_df, 
+        broadcast(static_stops_df),
         parsed_stream.current_stop_id == static_stops_df.stop_id, 
         "left"
     ).withColumn(
