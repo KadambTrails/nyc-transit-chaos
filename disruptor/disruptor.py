@@ -21,14 +21,14 @@ def attack():
             postgis_container = client.containers.get("nyc-transit-chaos-postgis-1")
             
             print("\n killing the PostGIS Database Container!")
-            postgis_container.stop()
+            postgis_container.pause()
             print("PostGIS container successfully killed mid-stream.")
             
             print("Leaving database offline for 30 seconds to test resilience...")
             time.sleep(30)
             
             print("Auto-Recovery initiated. Resurrecting PostGIS Container...")
-            postgis_container.start()
+            postgis_container.unpause()
             print("PostGIS container is back online and running healthy.\n")
             
         except docker.errors.NotFound:
